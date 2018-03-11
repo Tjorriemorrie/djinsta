@@ -1,0 +1,10 @@
+{% extends 'djin/base.html' %}
+
+{% block content %}
+    <h2>Users</h2>
+    {% for user in users %}
+        <p><a href="/login/{{ user.pk }}">{{ user.username }}</a></p>
+    {% empty %}
+        <p>Add users via admin panel</p>
+    {% endfor %}
+{% endblock %}
