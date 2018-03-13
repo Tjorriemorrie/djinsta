@@ -38,6 +38,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'background_task',
 ]
 
 MIDDLEWARE = [
@@ -81,6 +82,15 @@ DATABASES = {
         'OPTIONS': {
             'timeout': 30,
         }
+    }
+}
+
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.filebased.FileBasedCache',
+        'LOCATION': os.path.join(BASE_DIR, 'django_cache'),
+        'TIMEOUT': 3600 * 8
     }
 }
 

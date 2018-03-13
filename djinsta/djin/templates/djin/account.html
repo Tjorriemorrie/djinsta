@@ -1,0 +1,15 @@
+{% extends 'djin/base.html' %}
+
+{% block content %}
+    <h2>Account {{ account.username }}</h2>
+
+    <p><a href="/login/{{ account.pk }}">
+        {% if account.cookies %}Re-login{% else %}Login{% endif %}
+    </a></p>
+
+    <p><a href="/process/{{ account.pk }}">
+        {% if account.processing %}Stop{% else %}Start{% endif %} processing
+    </a></p>
+
+    <p><a href="/">Back to accounts</a></p>
+{% endblock %}

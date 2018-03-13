@@ -1,38 +1,39 @@
 from django.contrib.auth import login, logout
-from django.contrib.auth.models import User
 from django.core.cache import cache
 from django.shortcuts import render, redirect
 
+from .tasks import my_profile
+from .models import Account
 from .instagram import Instagram
 
 
 def index(request):
-    User.objects.filter(groups__name__exact='instagram').all()
     context = {
-        'users': User.objects.all(),
+        'accounts': Account.objects.filter(password__isnull=False).all(),
     }
     return render(request, 'djin/index.html', context)
 
 
-def login_view(request, user_pk):
-    user = User.objects.get(pk=user_pk)
-    login(request, user)
-    with Instagram(user) as insta:
-        insta.login()
-    return redirect('dashboard')
-
-
-def logout_view(request):
-    logout(request)
-    browser = cache.get('browser')
-    if browser:
-        browser.delete_all_cookies()
-        browser.quit()
-    return redirect('index')
-
-
-def dashboard(request):
+def account_view(request, account_pk):
+    account = Account.objects.get(pk=account_pk)
     context = {
-        'user': request.user,
+        'account': account,
     }
-    return render(request, 'djin/dashboard.html', context)
+    return render(request, 'djin/account.html', context)
+
+
+def login_view(request, account_pk):
+    """log in to instagram"""
+    account = Account.objects.get(pk=account_pk)
+    with Instagram(account) as insta:
+        insta.login()
+    return redirect('account', account.pk)
+
+
+def process_view(request, account_pk):
+    account = Account.objects.get(pk=account_pk)
+    account.processing = not account.processing
+    account.save()
+    if account.processing:
+        my_profile(account_pk)
+    return redirect('account', account_pk)
