@@ -2,6 +2,11 @@
 
 {% block content %}
     <h2>Account {{ account.username }}</h2>
+    <h4>
+        <span>Posts {{ account.posts_count }}</span>
+        <span>Followers {{ account.followers_count }}</span>
+        <span>Followings {{ account.following_count }}</span>
+    </h4>
 
     <p><a href="/login/{{ account.pk }}">
         {% if account.cookies %}Re-login{% else %}Login{% endif %}
