@@ -1,18 +1,17 @@
 import json
-
-import time
-
 import re
+import time
 from urllib.parse import urlparse
 
 from django.conf import settings
+from django.utils.dateparse import parse_datetime
 from selenium import webdriver
 from selenium.common.exceptions import NoSuchElementException, TimeoutException
 from selenium.webdriver import ActionChains
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.wait import WebDriverWait
 
-from .models import Account, Post
+from .models import Account, Post, Tag, Location, Media
 
 URL_INSTAGRAM = 'https://www.instagram.com'
 
@@ -38,7 +37,7 @@ class Instagram:
         self.driver = webdriver.Chrome(settings.BROWSER_CHROME, chrome_options=options)
 
         # set waiting on elements to load
-        self.driver.implicitly_wait(5)
+        # self.driver.implicitly_wait(5)
 
         # load cookies
         if account.cookies:
@@ -75,18 +74,171 @@ class Instagram:
         account.save()
 
         # upsert posts
-        for i, post in enumerate(page.posts):
+        for i, code in enumerate(page.posts):
             # only check a limited amount of posts per user
             if i >= check_posts:
                 break
             # upsert post
-            hash, created = Post.objects.update_or_create(
+            post, created = Post.objects.update_or_create(
                 account=account,
-                hash=post,
+                code=code,
             )
             # till existing post found
             if not created:
                 break
+
+    def upsert_post(self, post):
+        """Update information from post"""
+        page = PostPage(self.driver, post.code)
+        post.count, post.kind = page.popularity
+        post.created_at = page.created_at
+        post.description = page.description
+        loc_code, loc_name = page.location
+        for media_item in page.media:
+            media, created = Media.objects.get_or_create(
+                post=post, kind=media_item['kind'], source=media_item['source'],
+                defaults={
+                    'size': media_item.get('size'),
+                    'poster': media_item.get('poster'),
+                    'extension': media_item.get('extension')
+                })
+        if loc_code:
+            location, created = Location.objects.get_or_create(
+                code=loc_code, name=loc_name)
+            post.location = location
+        tags = []
+        for tag_item in page.tags:
+            tag, created = Tag.objects.get_or_create(word=tag_item)
+            tags.append(tag)
+        post.tags.set(tags)
+        post.save()
+
+
+########################################################################################
+# Base page
+########################################################################################
+
+class BasePage:
+
+    def __init__(self, driver, param=''):
+        self.driver = driver
+        self.driver.get(self.URL_PATTERN.format(param))
+
+    def _parse_number(self, number):
+        """
+        Parses the number. Remove the unused comma. Replace the concatenation with relevant zeros. Remove the dot.
+
+        :param number: str
+
+        :return: int
+        """
+        formatted_num = number.replace(',', '')
+        formatted_num = re.sub(r'(k)$', '00' if '.' in formatted_num else '000', formatted_num)
+        formatted_num = re.sub(r'(m)$', '00000' if '.' in formatted_num else '000000', formatted_num)
+        formatted_num = formatted_num.replace('.', '')
+        return int(formatted_num)
+
+    def _parse_tags(self, sentence):
+        """Parses the sentences for hashtags and returns a list"""
+        if not sentence:
+            return []
+        return [t.lower() for t in re.findall(r'#(\w+)', sentence)]
+
+
+# location feed
+# explore/locations/(\d+)
+
+
+########################################################################################
+# Post page
+########################################################################################
+
+class PostPageError(InstagramError):
+    """Error on post page"""
+
+
+class PostPage(BasePage):
+
+    URL_PATTERN = URL_INSTAGRAM + '/p/{}'
+
+    @property
+    def created_at(self):
+        return parse_datetime(
+            self.driver.find_element_by_xpath('//time').get_attribute('datetime'))
+
+    @property
+    def username(self):
+        return self.driver.find_element_by_xpath('//article/header/div/div/div/a').text
+
+    @property
+    def popularity(self):
+        sentence = self.driver.find_element_by_xpath('//article/div/section/div').text
+        words = sentence.split(' ')
+        try:
+            count = self._parse_number(words[0])
+        except ValueError:
+            return None, None
+        kind = words[1]
+        return count, kind
+
+    @property
+    def media_container(self):
+        return self.driver.find_element_by_xpath('//article/div[1]/div')
+
+    @property
+    def media_chevron(self):
+        return self.driver.find_element_by_xpath(
+            '//article/div/div//a[contains(concat(" ",normalize-space(@class)," ")," coreSpriteRightChevron ")]')
+
+    @property
+    def media(self):
+        """return the media sources"""
+        media = []
+        while True:
+            try:
+                vid = self.driver.find_element_by_xpath('//article//video')
+                src = vid.get_attribute('src')
+                poster = vid.get_attribute('poster')
+                extension = vid.get_attribute('type')
+                media.append({'kind': Media.VID, 'source': src, 'poster': poster, 'extension': extension})
+            except NoSuchElementException:
+                img = self.driver.find_element_by_xpath('//article/div[1]/div/div//div[1]/img')
+                src = [s.strip() for s in img.get_attribute('srcset').split(',')][-1]
+                src, size = src.split(' ')
+                media.append({'kind': Media.IMG, 'source': src, 'size': int(size[:-1])})
+            # next image
+            try:
+                ActionChains(self.driver).move_to_element(
+                    self.media_container).pause(1).click(
+                    self.media_chevron).perform()
+            except NoSuchElementException:
+                break
+        return media
+
+    @property
+    def description(self):
+        """If no description there would be no comment"""
+        try:
+            return self.driver.find_element_by_xpath(
+                f'//article//ul/li//*[contains(text(), "{self.username}")]/following-sibling::span').text
+        except NoSuchElementException:
+            return
+
+    @property
+    def tags(self):
+        """Return parsed tags from description"""
+        return self._parse_tags(self.description)
+
+    @property
+    def location(self):
+        """Return id and location name"""
+        try:
+            loc = self.driver.find_element_by_xpath('//article/header/div[2]/div[2]/a')
+        except NoSuchElementException:
+            return None, None
+        code = re.search(r'locations/(\d+)', loc.get_attribute('href')).groups()[0]
+        name = loc.text
+        return code, name
 
 
 ########################################################################################
@@ -97,11 +249,9 @@ class ProfilePageError(InstagramError):
     """Error on profile page"""
 
 
-class ProfilePage:
+class ProfilePage(BasePage):
 
-    def __init__(self, driver, username):
-        self.driver = driver
-        self.driver.get(f'{URL_INSTAGRAM}/{username}')
+    URL_PATTERN = URL_INSTAGRAM + '/{}'
 
     @property
     def posts_count(self):
@@ -155,20 +305,6 @@ class ProfilePage:
                     raise ProfilePageError('No new elements but spinner remains')
                 break
 
-    def _parse_number(self, number):
-        """
-        Parses the number. Remove the unused comma. Replace the concatenation with relevant zeros. Remove the dot.
-
-        :param number: str
-
-        :return: int
-        """
-        formatted_num = number.replace(',', '')
-        formatted_num = re.sub(r'(k)$', '00' if '.' in formatted_num else '000', formatted_num)
-        formatted_num = re.sub(r'(m)$', '00000' if '.' in formatted_num else '000000', formatted_num)
-        formatted_num = formatted_num.replace('.', '')
-        return int(formatted_num)
-
     def is_spinner_gone(self):
         """Is the loading spinner removed"""
         try:
@@ -186,11 +322,9 @@ class LoginPageError(InstagramError):
     """Error on login page"""
 
 
-class LoginPage:
+class LoginPage(BasePage):
 
-    def __init__(self, driver):
-        self.driver = driver
-        self.driver.get(URL_INSTAGRAM)
+    URL_PATTERN = URL_INSTAGRAM
 
     @property
     def login_link(self):
