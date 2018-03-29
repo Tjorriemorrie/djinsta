@@ -3,6 +3,7 @@ from background_task import background
 
 from .instagram import Instagram
 from .models import Account
+from .insight import account_ix
 
 
 @wrapt.decorator
@@ -20,7 +21,7 @@ def extract_account(wrapped, instance, args, kwargs):
 def my_profile(account):
     """parse my profile"""
     with Instagram(account) as insta:
-        insta.upsert_profile()
+        insta.upsert_profile(account)
         for post in account.posts.all():
             insta.upsert_post(post)
     finished(account.pk)

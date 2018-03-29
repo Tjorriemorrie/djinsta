@@ -11,6 +11,7 @@ class Account(models.Model):
     followers_count = models.IntegerField(null=True, blank=True)
     following_count = models.IntegerField(null=True, blank=True)
 
+    # ignore
     tag = models.CharField(max_length=30, null=True, blank=True)
 
     updated_at = models.DateTimeField(auto_now=True)
@@ -57,7 +58,7 @@ class Post(models.Model):
 class Media(models.Model):
     IMG = 'img'
     VID = 'vid'
-    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='images')
+    post = models.ForeignKey(Post, on_delete=models.CASCADE, related_name='media')
 
     kind = models.CharField(max_length=3)
     source = models.CharField(max_length=250)

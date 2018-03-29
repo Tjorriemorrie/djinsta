@@ -134,3 +134,5 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 BROWSER_CHROME = os.path.join(BASE_DIR, 'browsers', 'chromedriver')
+
+WHOOSH_INDEX = os.path.join(BASE_DIR, 'whoosh')

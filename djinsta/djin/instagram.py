@@ -61,11 +61,11 @@ class Instagram:
             self.account.cookies = json.dumps(self.driver.get_cookies())
             self.account.save()
 
-    def upsert_profile(self, account=None, check_posts=1000):
+    def upsert_profile(self, account, check_posts=1000):
         """Update profile"""
-        username = account.username if account else self.account.username
-        account, created = Account.objects.update_or_create(username=username)
-        page = ProfilePage(self.driver, username)
+        page = ProfilePage(self.driver, account.username)
+        if page.is_private():
+            return account.delete()
 
         # upsert counts
         account.posts_count = page.posts_count
@@ -89,11 +89,20 @@ class Instagram:
 
     def upsert_post(self, post):
         """Update information from post"""
+        # posts can be deleted
         page = PostPage(self.driver, post.code)
+        if page.is_deleted():
+            return post.delete()
+
         post.count, post.kind = page.popularity
         post.created_at = page.created_at
         post.description = page.description
         loc_code, loc_name = page.location
+
+        # the media seems to move around on the vpn, will have to update it
+        # with every update and remove the duplicate old rows
+        previous_pks = [m.pk for m in post.media.all()]
+        current_pks = []
         for media_item in page.media:
             media, created = Media.objects.get_or_create(
                 post=post, kind=media_item['kind'], source=media_item['source'],
@@ -102,6 +111,11 @@ class Instagram:
                     'poster': media_item.get('poster'),
                     'extension': media_item.get('extension')
                 })
+            current_pks.append(media.pk)
+        redundant_pks = set(previous_pks) - set(current_pks)
+        if redundant_pks:
+            Media.objects.filter(pk__in=redundant_pks).delete()
+
         if loc_code:
             location, created = Location.objects.get_or_create(
                 code=loc_code, name=loc_name)
@@ -161,6 +175,15 @@ class PostPage(BasePage):
 
     URL_PATTERN = URL_INSTAGRAM + '/p/{}'
 
+    def is_deleted(self):
+        """is post deleted"""
+        try:
+            self.driver.find_element_by_xpath('//h2[text()="Sorry, this page isn\'t available."]')
+        except NoSuchElementException:
+            return False
+        return True
+
+
     @property
     def created_at(self):
         return parse_datetime(
@@ -202,6 +225,11 @@ class PostPage(BasePage):
                 extension = vid.get_attribute('type')
                 media.append({'kind': Media.VID, 'source': src, 'poster': poster, 'extension': extension})
             except NoSuchElementException:
+                # sometimes the srcset is not loaded yet
+                WebDriverWait(self.driver, 10).until(
+                    lambda driver: driver.find_element_by_xpath(
+                        '//article/div[1]/div/div//div[1]/img').get_attribute('srcset')
+                )
                 img = self.driver.find_element_by_xpath('//article/div[1]/div/div//div[1]/img')
                 src = [s.strip() for s in img.get_attribute('srcset').split(',')][-1]
                 src, size = src.split(' ')
@@ -252,6 +280,14 @@ class ProfilePageError(InstagramError):
 class ProfilePage(BasePage):
 
     URL_PATTERN = URL_INSTAGRAM + '/{}'
+
+    def is_private(self):
+        """some accounts are private"""
+        try:
+            self.driver.find_element_by_xpath('//h2[text()="This Account is Private"]')
+        except NoSuchElementException:
+            return False
+        return True
 
     @property
     def posts_count(self):

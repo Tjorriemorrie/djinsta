@@ -5,6 +5,7 @@ from django.shortcuts import render, redirect
 from .tasks import my_profile
 from .models import Account
 from .instagram import Instagram
+from .insight import get_account
 
 
 def index(request):
@@ -16,8 +17,10 @@ def index(request):
 
 def account_view(request, account_pk):
     account = Account.objects.get(pk=account_pk)
+
     context = {
         'account': account,
+        'doc': get_account(account),
     }
     return render(request, 'djin/account.html', context)
 
