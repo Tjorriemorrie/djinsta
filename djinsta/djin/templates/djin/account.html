@@ -21,13 +21,13 @@
     <h3>Whoosh</h3>
     <dl>
         <dt>fields and keys</dt>
-        {% for k, v in doc.items %}
+        {% for k, v in account_doc.items %}
             <dd>{{ k }}: {{ v }}</dd>
         {% endfor %}
     </dl>
 
     <h3>My posts</h3>
-    {% for post in account.posts.all %}
+    {% for post, doc in posts %}
         <p>ID {{ post.pk }}</p>
         {% if post.description %}
             <p>{{ post.description }}</p>
@@ -47,6 +47,12 @@
         {% if post.locaiton %}
             <br/>at {{ post.location.name }}
         {% endif %}
+        <dl>
+            <dt>fields and keys</dt>
+            {% for k, v in doc.items %}
+                <dd>{{ k }}: {{ v }}</dd>
+            {% endfor %}
+        </dl>
         <hr/>
     {% endfor %}
 {% endblock %}

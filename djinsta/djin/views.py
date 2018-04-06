@@ -5,7 +5,7 @@ from django.shortcuts import render, redirect
 from .tasks import my_profile
 from .models import Account
 from .instagram import Instagram
-from .insight import get_account
+from .insight import get_account, get_post
 
 
 def index(request):
@@ -20,7 +20,8 @@ def account_view(request, account_pk):
 
     context = {
         'account': account,
-        'doc': get_account(account),
+        'account_doc': get_account(account),
+        'posts': [(p, get_post(p)) for p in account.posts.all()],
     }
     return render(request, 'djin/account.html', context)
 

@@ -69,3 +69,10 @@ class Media(models.Model):
 
     class Meta:
         ordering = ['size']
+
+
+class AccountHistory(models.Model):
+    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='histories')
+
+    class Meta:
+        verbose_name_plural = 'AccountHistories'
