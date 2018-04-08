@@ -7,6 +7,8 @@ class Account(models.Model):
     processing = models.BooleanField(default=False, blank=True)
     cookies = models.TextField(max_length=1000, null=True, blank=True)
 
+    bio = models.TextField(null=True, blank=True)
+    website = models.CharField(max_length=250, null=True, blank=True)
     posts_count = models.IntegerField(null=True, blank=True)
     followers_count = models.IntegerField(null=True, blank=True)
     following_count = models.IntegerField(null=True, blank=True)
@@ -53,6 +55,9 @@ class Post(models.Model):
 
     updated_at = models.DateTimeField(auto_now=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'Post {self.account.username} - {self.created_at:%-d %b %Y}'
 
 
 class Media(models.Model):

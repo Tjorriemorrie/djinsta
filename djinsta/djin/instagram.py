@@ -71,6 +71,8 @@ class Instagram:
         account.posts_count = page.posts_count
         account.followers_count = page.followers_count
         account.following_count = page.following_count
+        account.bio = page.bio
+        account.website = page.website
         account.save()
 
         # upsert posts
@@ -195,6 +197,7 @@ class PostPage(BasePage):
 
     @property
     def popularity(self):
+        # todo fix: 'charityflock, veneration_helensvale, ilove_relaxx, angislon, kuldeep_singh.solanki, hayley_brown6, mardanjahya111 and martadziak like this'
         sentence = self.driver.find_element_by_xpath('//article/div/section/div').text
         words = sentence.split(' ')
         try:
@@ -306,6 +309,20 @@ class ProfilePage(BasePage):
         return self._parse_number(
             self.driver.find_element_by_xpath("//ul/li[3]/a/span").text
         )
+
+    @property
+    def bio(self):
+        try:
+            return self.driver.find_element_by_xpath("//article/header//div[2]/span").text
+        except NoSuchElementException:
+            pass
+
+    @property
+    def website(self):
+        try:
+            return self.driver.find_element_by_xpath("//article/header//div[2]/a").text
+        except NoSuchElementException:
+            pass
 
     @property
     def container(self):

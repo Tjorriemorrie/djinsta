@@ -2,3 +2,4 @@ django
 django-background-tasks
 selenium
 whoosh
+elasticsearch-dsl

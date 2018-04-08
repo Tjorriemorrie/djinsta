@@ -1,11 +1,14 @@
-from django.contrib.auth import login, logout
-from django.core.cache import cache
+import logging
+
 from django.shortcuts import render, redirect
 
 from .tasks import my_profile
 from .models import Account
 from .instagram import Instagram
-from .insight import get_account, get_post
+from .insight import get_account
+
+
+logger = logging.getLogger(__name__)
 
 
 def index(request):
@@ -17,11 +20,12 @@ def index(request):
 
 def account_view(request, account_pk):
     account = Account.objects.get(pk=account_pk)
+    logger.info(f'Viewing account {account}')
 
     context = {
         'account': account,
-        'account_doc': get_account(account),
-        'posts': [(p, get_post(p)) for p in account.posts.all()],
+        'account_doc': get_account(account, ignore=404),
+        'posts': [(p, 1) for p in account.posts.all()],
     }
     return render(request, 'djin/account.html', context)
 

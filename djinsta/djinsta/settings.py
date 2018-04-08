@@ -136,3 +136,22 @@ STATIC_URL = '/static/'
 BROWSER_CHROME = os.path.join(BASE_DIR, 'browsers', 'chromedriver')
 
 WHOOSH_INDEX = os.path.join(BASE_DIR, 'whoosh')
+
+
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'handlers': {
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+        },
+    },
+    'loggers': {
+        'djin': {
+            'handlers': ['console'],
+            'propagate': False,
+            'level': 'DEBUG',
+        },
+    },
+}
