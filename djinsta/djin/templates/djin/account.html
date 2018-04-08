@@ -18,11 +18,15 @@
 
     <p><a href="/">Back to accounts</a></p>
 
-    <h3>Whoosh</h3>
+    <h3>ES</h3>
     <dl>
-        <dt>fields and keys</dt>
-        {% for k, v in account_doc.items %}
-            <dd>{{ k }}: {{ v }}</dd>
+        <dt>username</dt>
+        <dd>{{ account_doc.username }}</dd>
+    </dl>
+    <dl>
+        <dt>tags</dt>
+        {% for tag, count, selected in account_agg.facets.tags %}
+            <dd>{{ count }} &mdash; {{ tag }}</dd>
         {% endfor %}
     </dl>
 

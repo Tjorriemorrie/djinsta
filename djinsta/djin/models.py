@@ -33,6 +33,12 @@ class Location(models.Model):
     minor = models.CharField(max_length=250)
     major = models.CharField(max_length=250)
 
+    def parts(self):
+        try:
+            return [l.lower().strip() for l in self.name.split(',')]
+        except ValueError:
+            return []
+
     def save(self, *args, **kwargs):
         try:
             self.minor, self.major = [l.strip() for l in self.name.split(',')]

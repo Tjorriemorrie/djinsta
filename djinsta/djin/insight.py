@@ -1,11 +1,11 @@
 import logging
+from itertools import chain
 
 from django.db.models.signals import post_delete
 from django.dispatch import receiver
-from elasticsearch_dsl import connections, Index, DocType, Integer, Keyword, Date, Text
+from elasticsearch_dsl import connections, Index, DocType, Integer, Keyword, Date, Text, FacetedSearch, TermsFacet
 
-from .models import Account
-
+from .models import Account, Post
 
 logger = logging.getLogger(__name__)
 connections.create_connection(hosts=['localhost'], timeout=5)
@@ -37,6 +37,12 @@ class AccountDoc(DocType):
     website = Keyword(store=True)
     joined_at = Date(store=True)
 
+    # post
+    location = Keyword(store=True)
+    tags = Keyword(store=True)
+    count = Integer(store=True)
+    posted_at = Date(store=True)
+
     class Meta:
         index = 'account'
 
@@ -49,6 +55,7 @@ AccountDoc.init()
 
 def index_account(account):
     """Upsert account document"""
+    posts = account.posts.all()
     doc = AccountDoc(
         meta={'id': account.pk},
         username=account.username,
@@ -59,12 +66,12 @@ def index_account(account):
         website=account.website,
         joined_at=account.created_at,
 
-        # location=KEYWORD(stored=True, lowercase=True, commas=True),
-        # tags=KEYWORD(stored=True, lowercase=True),
-        # description=TEXT(stored=True),
-        # count=NUMERIC(stored=True),
-        # kind=KEYWORD(stored=True, lowercase=True),
-        # created_at=DATETIME(stored=True),
+        # post
+        # todo convert locations to geopoints
+        location=list(chain.from_iterable(p.location.parts() for p in posts if p.location)),
+        tags=[t.word.lower() for p in posts for t in p.tags.all()],
+        count=[p.count for p in posts if p.count],
+        posted_at=[p.created_at for p in posts],
     )
     logger.info(f'Indexing {doc}')
     return doc.save()
@@ -84,12 +91,31 @@ def remove_account(sender, instance, **kwargs):
     """delete account and all the posts"""
     account_doc = AccountDoc.get(instance.pk)
     account_doc.delete()
-    # post_docs = Post
+    logger.info(f'Deleted {account_doc}')
+    for post in instance:
+        post_doc = PostDoc.get(post.pk)
+        post_doc.delete()
+        logger.info(f'Deleted {post_doc}')
 
 
 def get_account(account, **kwargs):
     """Get account doc"""
     return AccountDoc.get(account.pk, **kwargs)
+
+
+class AccountSearch(FacetedSearch):
+    index = ['account', ]
+    # doc type of result
+    doc_types = [AccountDoc, ]
+    # fields that should be searched
+    fields = ['tags', ]
+
+    facets = {
+        # use bucket aggregations to define facets
+        'tags': TermsFacet(field='tags'),
+    }
+
+    # sort = []
 
 
 ###############################################################################
@@ -137,14 +163,13 @@ def index_post(post):
     return doc.save()
 
 
-# @receiver(post_delete, sender=Post)
-# def delete_pst(sender, instance, **kwargs):
-#     writer = AsyncWriter(post_ix)
-#     writer.delete_by_term('pk', instance.pk)
-#     writer.commit()
-#
-#
-# def get_post(post):
-#     """Get post record"""
-#     with post_ix.searcher() as searcher:
-#         return searcher.document(pk=str(post.pk))
+@receiver(post_delete, sender=Post)
+def delete_pst(sender, instance, **kwargs):
+    post_doc = PostDoc.get(instance.pk)
+    post_doc.delete()
+    logger.info(f'Deleted {post_doc}')
+
+
+def get_post(post, **kwargs):
+    """Get post record"""
+    return PostDoc.get(post.pk, **kwargs)

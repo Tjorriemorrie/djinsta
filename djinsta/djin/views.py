@@ -5,8 +5,7 @@ from django.shortcuts import render, redirect
 from .tasks import my_profile
 from .models import Account
 from .instagram import Instagram
-from .insight import get_account
-
+from .insight import get_account, get_post, AccountSearch
 
 logger = logging.getLogger(__name__)
 
@@ -21,11 +20,11 @@ def index(request):
 def account_view(request, account_pk):
     account = Account.objects.get(pk=account_pk)
     logger.info(f'Viewing account {account}')
-
     context = {
         'account': account,
         'account_doc': get_account(account, ignore=404),
-        'posts': [(p, 1) for p in account.posts.all()],
+        'account_agg': AccountSearch().execute(),
+        'posts': [(p, get_post(p, ignore=404)) for p in account.posts.all()],
     }
     return render(request, 'djin/account.html', context)
 
