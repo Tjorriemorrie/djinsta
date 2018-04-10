@@ -113,6 +113,7 @@ class AccountSearch(FacetedSearch):
     facets = {
         # use bucket aggregations to define facets
         'tags': TermsFacet(field='tags'),
+        'locations': TermsFacet(field='location'),
     }
 
     # sort = []

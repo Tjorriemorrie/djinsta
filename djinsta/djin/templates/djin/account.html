@@ -28,6 +28,10 @@
         {% for tag, count, selected in account_agg.facets.tags %}
             <dd>{{ count }} &mdash; {{ tag }}</dd>
         {% endfor %}
+        <dt>locations</dt>
+        {% for term, count, selected in account_agg.facets.locations %}
+            <dd>{{ count }} &mdash; {{ term }}</dd>
+        {% endfor %}
     </dl>
 
     <h3>My posts</h3>

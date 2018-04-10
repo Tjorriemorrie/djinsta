@@ -4,7 +4,7 @@ import wrapt
 from background_task import background
 
 from .instagram import Instagram
-from .models import Account
+from .models import Account, AccountHistory, PostHistory
 from .insight import index_account, index_post
 
 logger = logging.getLogger(__name__)
@@ -32,7 +32,10 @@ def my_profile(account):
         for post in account.posts.all():
             logger.info(f'Updating post {post}')
             insta.upsert_post(post)
+            PostHistory.upsert(post)
             index_post(post)
+
+    AccountHistory.upsert(account)
 
     doc_created = index_account(account)
     logger.info(f'Created account doc? {doc_created}')
